@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  Host:
+    Type: String
+    Default: github.com
+    Description: Github host name
+  AllowOrigin:
+    Type: String
+    Default: "https://"
+    Description: Allow Origin. '*' should be avoided.
+  ClientId:
+    Type: String
+    Description: Clinet Id for OAuth application
+  ClientSecret:
+    Type: String
+    Description: Clinet Secret for OAuth application
+  Scope:
+    Type: String
+    Default: "user:email"
+    Description: Scope for OAuth application
+Resources:
+  HttpApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+          def handler(event, context):
+              import os
+              import json
+              import urllib.parse
+              import urllib.request
+              host = os.environ["HOST"]
+              client_id = os.environ["CLIENT_ID"]
+              client_secret = os.environ["CLIENT_SECRET"]
+              scope = os.environ["SCOPE"]
+              if "queryStringParameters" in event:
+                  query = event["queryStringParameters"]
+                  code = query.get("code", None)
+                  state = query.get("state", None)
+                  if code is not None:
+                      params = {
+                          "code": code,
+                          "client_id": client_id,
+                          "client_secret": client_secret,
+                      }
+                      if state is not None:
+                          params["state"] = state
+                      req = urllib.request.Request(f"https://{host}/login/oauth/access_token?{urllib.parse.urlencode(params)}", method="POST")
+                      with urllib.request.urlopen(req) as res:
+                          body = res.read().decode("utf-8")
+                      return {
+                          "statusCode": 200,
+                          "body": json.dumps({k: v[0] for k, v in urllib.parse.parse_qs(body).items()}),
+                       }
+              params = {
+                  "client_id": client_id,
+                  "scope": scope,
+              }
+              return {
+                  "statusCode": 301,
+                  "headers": {
+                      "Location": f"https://{host}/login/oauth/authorize?{urllib.parse.urlencode(params)}"
+                  }
+              }
+      Handler: index.handler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          HOST: !Ref Host
+          CLIENT_ID: !Ref ClientId
+          CLIENT_SECRET: !Ref ClientSecret
+          SCOPE: !Ref Scope
+      Events:
+        ExplicitApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /login
+            PayloadFormatVersion: "2.0"
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogs.Arn
+        Format: >-
+          {"requestId":"$context.requestId", "ip": "$context.identity.sourceIp",
+          "caller":"$context.identity.caller",
+          "user":"$context.identity.user","requestTime":"$context.requestTime",
+          "routeKey":"$context.routeKey","status":"$context.status"}
+      CorsConfiguration:
+        AllowOrigins:
+        - !Ref AllowOrigin
+        AllowMethods:
+        - GET
+      FailOnWarnings: True
+
+  AccessLogs:
+    Type: AWS::Logs::LogGroup
+
+Outputs:
+  HttpApiUrl:
+    Description: URL of your API endpoint
+    Value:
+      Fn::Sub: 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/login'
+  HttpApiId:
+    Description: Api id of HttpApi
+    Value:
+      Ref: HttpApi

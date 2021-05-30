@@ -20,19 +20,33 @@ Parameters:
     Default: "user:email"
     Description: Scope for OAuth application
 Resources:
+  Secrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: !Sub "${AWS::StackName}/secrets"
+      SecretString: !Sub '{"client_id":"${ClientId}","client_secret":"${ClientSecret}"}'
   HttpApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       InlineCode: |
           def handler(event, context):
+              import boto3
               import os
               import json
               import urllib.parse
               import urllib.request
               host = os.environ["HOST"]
-              client_id = os.environ["CLIENT_ID"]
-              client_secret = os.environ["CLIENT_SECRET"]
               scope = os.environ["SCOPE"]
+              try:
+                  client = boto3.client(service_name="secretsmanager")
+                  secret_id = os.environ["SECRET_ID"]
+                  get_secret_value_response = client.get_secret_value(SecretId=secret_id)
+              except botocore.exceptions.ClientError as e:
+                  raise e
+              else:
+                  secret = json.loads(get_secret_value_response["SecretString"])
+              client_id = secret["client_id"]
+              client_secret = secret["client_secret"]
               if "queryStringParameters" in event:
                   query = event["queryStringParameters"]
                   code = query.get("code", None)
@@ -69,9 +83,14 @@ Resources:
       Environment:
         Variables:
           HOST: !Ref Host
-          CLIENT_ID: !Ref ClientId
-          CLIENT_SECRET: !Ref ClientSecret
           SCOPE: !Ref Scope
+          SECRET_ID: !Sub "${AWS::StackName}/secrets"
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action:
+          - "secretsmanager:GetSecretValue"
+          Resource: '*'
       Events:
         ExplicitApi:
           Type: HttpApi

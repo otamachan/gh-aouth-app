@@ -52,9 +52,11 @@ Resources:
                           "statusCode": 200,
                           "body": json.dumps({k: v[0] for k, v in urllib.parse.parse_qs(body).items()}),
                        }
+              import random, string
               params = {
                   "client_id": client_id,
                   "scope": scope,
+                  "state": "".join([random.choice(string.ascii_letters + string.digits) for i in range(12)])
               }
               return {
                   "statusCode": 301,

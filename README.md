@@ -5,7 +5,7 @@ https://otamachan.github.io/gh-oauth-app/
 This is a sample web page application using GitHub OAuth.
 A web page only application cannot use GitHub OAuth because its endpoint does not support CORS. https://github.com/isaacs/github/issues/330 .
 In this sample application, I use AWS Lambda/API Gateway to enable GitHub OAuth login with CORS support.
-Please also refer to the [Cloudformation template](gh-aouth-app.template.yaml) for details.
+Please also refer to the [Cloudformation template](gh-oauth-app.template.yaml) for details.
 
 You can launch the same stack with this ↓
 

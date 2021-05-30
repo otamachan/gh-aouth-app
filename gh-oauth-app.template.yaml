@@ -29,24 +29,26 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       InlineCode: |
+          import boto3
+          import json
+          import os
+
+          try:
+              client = boto3.client(service_name="secretsmanager")
+              secret_id = os.environ["SECRET_ID"]
+              get_secret_value_response = client.get_secret_value(SecretId=secret_id)
+          except botocore.exceptions.ClientError as e:
+              raise e
+          else:
+              secret = json.loads(get_secret_value_response["SecretString"])
+          client_id = secret["client_id"]
+          client_secret = secret["client_secret"]
+          host = os.environ["HOST"]
+          scope = os.environ["SCOPE"]
+
           def handler(event, context):
-              import boto3
-              import os
-              import json
               import urllib.parse
               import urllib.request
-              host = os.environ["HOST"]
-              scope = os.environ["SCOPE"]
-              try:
-                  client = boto3.client(service_name="secretsmanager")
-                  secret_id = os.environ["SECRET_ID"]
-                  get_secret_value_response = client.get_secret_value(SecretId=secret_id)
-              except botocore.exceptions.ClientError as e:
-                  raise e
-              else:
-                  secret = json.loads(get_secret_value_response["SecretString"])
-              client_id = secret["client_id"]
-              client_secret = secret["client_secret"]
               if "queryStringParameters" in event:
                   query = event["queryStringParameters"]
                   code = query.get("code", None)

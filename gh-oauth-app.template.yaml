@@ -80,6 +80,7 @@ Resources:
               }
       Handler: index.handler
       Runtime: python3.8
+      Timeout: 5
       Environment:
         Variables:
           HOST: !Ref Host
